@@ -1,0 +1,238 @@
+// =============================================================
+// HELPI - Controlador de Autenticação
+// Login de clientes e profissionais + Refresh Token
+//
+// ESCALABILIDADE:
+// - Retorna access_token (15min) + refresh_token (30d)
+// - Endpoint /refresh para renovar sem re-login
+// =============================================================
+
+const pool = require('../config/database');
+const bcrypt = require('bcrypt');
+const { gerarTokens, verificarRefreshToken, gerarAccessToken } = require('../utils/jwt');
+const logger = require('../utils/logger');
+
+// ─── LOGIN CLIENTE ──────────────────────────────────────────
+const loginCliente = async (req, res, next) => {
+    try {
+        const { email, senha } = req.body;
+
+        const resultado = await pool.query(
+            'SELECT id, nome, email, senha FROM clientes WHERE email = $1',
+            [email.toLowerCase().trim()]
+        );
+
+        if (resultado.rows.length === 0) {
+            logger.warn(`[AUTH] LOGIN_FALHA: email não encontrado (tipo: cliente, email: ${email})`);
+            return res.status(401).json({
+                erro: 'Email ou senha inválidos'
+            });
+        }
+
+        const cliente = resultado.rows[0];
+        const senhaValida = await bcrypt.compare(senha, cliente.senha);
+
+        if (!senhaValida) {
+            logger.warn(`[AUTH] LOGIN_FALHA: senha incorreta (tipo: cliente, email: ${email})`);
+            return res.status(401).json({
+                erro: 'Email ou senha inválidos'
+            });
+        }
+
+        // Gera o par access + refresh
+        const tokens = gerarTokens(cliente.id, 'cliente');
+
+        logger.info(`[AUTH] LOGIN_OK: cliente ${cliente.id} autenticado com sucesso`);
+
+        res.json({
+            mensagem: 'Login realizado com sucesso',
+            access_token: tokens.accessToken,
+            refresh_token: tokens.refreshToken,
+            // Retrocompatibilidade: mantém campo "token" para apps antigos
+            token: tokens.accessToken,
+            usuario: {
+                id: cliente.id,
+                nome: cliente.nome,
+                email: cliente.email,
+                tipo: 'cliente'
+            }
+        });
+    } catch (erro) {
+        next(erro);
+    }
+};
+
+// ─── LOGIN PROFISSIONAL ─────────────────────────────────────
+const loginProfissional = async (req, res, next) => {
+    try {
+        const { email, senha } = req.body;
+
+        const resultado = await pool.query(
+            'SELECT id, nome, email, senha, status FROM profissionais WHERE email = $1',
+            [email.toLowerCase().trim()]
+        );
+
+        if (resultado.rows.length === 0) {
+            logger.warn(`[AUTH] LOGIN_FALHA: email não encontrado (tipo: profissional, email: ${email})`);
+            return res.status(401).json({
+                erro: 'Email ou senha inválidos'
+            });
+        }
+
+        const profissional = resultado.rows[0];
+        const senhaValida = await bcrypt.compare(senha, profissional.senha);
+
+        if (!senhaValida) {
+            logger.warn(`[AUTH] LOGIN_FALHA: senha incorreta (tipo: profissional, email: ${email})`);
+            return res.status(401).json({
+                erro: 'Email ou senha inválidos'
+            });
+        }
+
+        // Verifica se o profissional está aprovado
+        if (profissional.status !== 'aprovado') {
+            return res.status(403).json({
+                erro: 'A sua conta ainda não foi aprovada. Aguarde a validação.',
+                status_conta: profissional.status
+            });
+        }
+
+        const tokens = gerarTokens(profissional.id, 'profissional');
+
+        logger.info(`[AUTH] LOGIN_OK: profissional ${profissional.id} autenticado com sucesso`);
+
+        res.json({
+            mensagem: 'Login realizado com sucesso',
+            access_token: tokens.accessToken,
+            refresh_token: tokens.refreshToken,
+            token: tokens.accessToken,
+            usuario: {
+                id: profissional.id,
+                nome: profissional.nome,
+                email: profissional.email,
+                tipo: 'profissional'
+            }
+        });
+    } catch (erro) {
+        next(erro);
+    }
+};
+
+// ─── REFRESH TOKEN ──────────────────────────────────────────
+// O cliente envia o refresh_token e recebe um novo access_token
+// sem precisar fazer login novamente
+const refreshToken = async (req, res, next) => {
+    try {
+        const { refresh_token } = req.body;
+
+        if (!refresh_token) {
+            return res.status(400).json({
+                erro: 'Refresh token é obrigatório.'
+            });
+        }
+
+        // Verifica se o refresh token é válido
+        let decoded;
+        try {
+            decoded = verificarRefreshToken(refresh_token);
+        } catch (err) {
+            if (err.name === 'TokenExpiredError') {
+                return res.status(401).json({
+                    erro: 'Refresh token expirado. Faça login novamente.'
+                });
+            }
+            return res.status(401).json({
+                erro: 'Refresh token inválido.'
+            });
+        }
+
+        // SEGURANÇA: Whitelist de tabelas (evita SQL injection via JWT comprometido)
+        let tabela;
+        if (decoded.tipo === 'cliente') {
+            tabela = 'clientes';
+        } else if (decoded.tipo === 'profissional') {
+            tabela = 'profissionais';
+        } else {
+            return res.status(401).json({
+                erro: 'Tipo de utilizador inválido no token.'
+            });
+        }
+
+        const resultado = await pool.query(`SELECT id FROM ${tabela} WHERE id = $1`, [decoded.id]);
+
+        if (resultado.rows.length === 0) {
+            return res.status(401).json({
+                erro: 'Usuário não encontrado. Faça login novamente.'
+            });
+        }
+
+        // Gera novo access token (o refresh continua válido)
+        const novoAccessToken = gerarAccessToken(decoded.id, decoded.tipo);
+
+        logger.info(`[AUTH] TOKEN_RENOVADO: ${decoded.tipo} ${decoded.id} recebeu novo access_token`);
+
+        res.json({
+            mensagem: 'Token renovado com sucesso',
+            access_token: novoAccessToken,
+            token: novoAccessToken // Retrocompatibilidade
+        });
+    } catch (erro) {
+        next(erro);
+    }
+};
+
+// ─── LOGIN ADMIN ──────────────────────────────────────────────
+const loginAdmin = async (req, res, next) => {
+    try {
+        const { email, senha } = req.body;
+
+        const resultado = await pool.query(
+            'SELECT id, nome, email, senha, role FROM admins WHERE email = $1',
+            [email.toLowerCase().trim()]
+        );
+
+        if (resultado.rows.length === 0) {
+            logger.warn(`[AUTH] LOGIN_FALHA: email não encontrado (tipo: admin, email: ${email})`);
+            return res.status(401).json({
+                erro: 'Email ou senha inválidos'
+            });
+        }
+
+        const admin = resultado.rows[0];
+        const senhaValida = await bcrypt.compare(senha, admin.senha);
+
+        if (!senhaValida) {
+            logger.warn(`[AUTH] LOGIN_FALHA: senha incorreta (tipo: admin, email: ${email})`);
+            return res.status(401).json({
+                erro: 'Email ou senha inválidos'
+            });
+        }
+
+        const tokens = gerarTokens(admin.id, 'admin');
+
+        logger.info(`[AUTH] LOGIN_OK: admin ${admin.id} autenticado com sucesso`);
+
+        res.json({
+            mensagem: 'Login realizado com sucesso',
+            access_token: tokens.accessToken,
+            refresh_token: tokens.refreshToken,
+            token: tokens.accessToken,
+            usuario: {
+                id: admin.id,
+                nome: admin.nome,
+                email: admin.email,
+                role: admin.role,
+                tipo: 'admin'
+            }
+        });
+    } catch (erro) {
+        next(erro);
+    }
+};
+
+module.exports = {
+    loginCliente,
+    loginProfissional,
+    loginAdmin,
+    refreshToken
+};

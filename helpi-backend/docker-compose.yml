@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  # ─── API NODE.JS (HELPI BACKEND) ───
+  api:
+    build: .
+    container_name: helpi-api
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    # SEGURANÇA V9: Credenciais movidas para .env (nunca hardcoded no compose)
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - helpi-network
+
+  # ─── BANCO DE DADOS POSTGRESQL + POSTGIS ───
+  db:
+    image: postgis/postgis:15-3.3
+    container_name: helpi-db
+    restart: unless-stopped
+    env_file:
+      - .env.db
+    ports:
+      - "5432:5432"
+    volumes:
+      - helpi-pgdata:/var/lib/postgresql/data
+    networks:
+      - helpi-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-helpi_user} -d ${POSTGRES_DB:-helpi_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  helpi-pgdata:
+
+networks:
+  helpi-network:
+    driver: bridge
