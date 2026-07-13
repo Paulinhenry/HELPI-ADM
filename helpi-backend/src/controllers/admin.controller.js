@@ -11,7 +11,7 @@ const getDashboardStats = async (req, res, next) => {
         // Faturação do dia
         const todayStr = new Date().toISOString().split('T')[0];
         const resFaturacao = await pool.query(`
-            SELECT COALESCE(SUM(valor), 0) as faturacao_diaria 
+            SELECT COALESCE(SUM(valor_cobrado), 0) as faturacao_diaria 
             FROM chamados_express 
             WHERE status IN ('em_andamento', 'concluido', 'pago') 
             AND criado_em >= $1::date
@@ -53,7 +53,7 @@ const getPendingProfessionals = async (req, res, next) => {
         const resultado = await pool.query(`
             SELECT id, nome, email, status, criado_em 
             FROM profissionais 
-            WHERE status = 'pendente'
+            WHERE status IN ('pendente', 'pendente_aprovacao', 'pendente_aprovação')
             ORDER BY criado_em DESC
         `);
         
