@@ -228,7 +228,7 @@ class _AppShellState extends State<AppShell> {
                   children: Sidebar.items.map((item) {
                     final isSelected = item.index == _selectedIndex;
                     return ListTile(
-                      leading: Icon(
+                      leading: FaIcon(
                         item.icon,
                         size: 18,
                         color: isSelected

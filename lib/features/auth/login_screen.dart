@@ -82,7 +82,7 @@ class _LoginScreenState extends State<LoginScreen>
               child: Container(
                 width: isWide ? 460 : double.infinity,
                 constraints: const BoxConstraints(maxWidth: 460),
-                padding: const EdgeInsets.all(40),
+                padding: EdgeInsets.all(isWide ? 40 : 24),
                 decoration: BoxDecoration(
                   color: AppColors.surface,
                   borderRadius: BorderRadius.circular(24),
@@ -345,8 +345,11 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   Widget _credentialRow(String role, String email) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
+    return Wrap(
+      alignment: WrapAlignment.center,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: 8,
+      runSpacing: 4,
       children: [
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -363,7 +366,6 @@ class _LoginScreenState extends State<LoginScreen>
             ),
           ),
         ),
-        const SizedBox(width: 8),
         Text(
           email,
           style: const TextStyle(

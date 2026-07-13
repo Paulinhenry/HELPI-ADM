@@ -296,12 +296,18 @@ class _ProfessionalsTab extends StatelessWidget {
               )),
               DataCell(StatusBadge.fromStatus(prof.status)),
               DataCell(
-                IconButton(
-                  tooltip: prof.status == 'ativo' ? 'Suspender' : 'Reativar',
+                TextButton.icon(
                   icon: FaIcon(
                     prof.status == 'ativo' ? FontAwesomeIcons.ban : FontAwesomeIcons.check,
                     color: prof.status == 'ativo' ? AppColors.error : AppColors.success,
-                    size: 16,
+                    size: 14,
+                  ),
+                  label: Text(
+                    prof.status == 'ativo' ? 'Bloquear' : 'Ativar',
+                    style: TextStyle(
+                      color: prof.status == 'ativo' ? AppColors.error : AppColors.success,
+                      fontSize: 12,
+                    ),
                   ),
                   onPressed: () => dir.toggleStatus('profissional', prof.id),
                 ),
@@ -354,11 +360,18 @@ class _ProfessionalsTab extends StatelessWidget {
                   Text('Registro: ${prof.joinDate}',
                       style: const TextStyle(color: AppColors.textMuted, fontSize: 12)),
                   const Spacer(),
-                  IconButton(
+                  TextButton.icon(
                     icon: FaIcon(
                       prof.status == 'ativo' ? FontAwesomeIcons.ban : FontAwesomeIcons.check,
                       color: prof.status == 'ativo' ? AppColors.error : AppColors.success,
-                      size: 16,
+                      size: 14,
+                    ),
+                    label: Text(
+                      prof.status == 'ativo' ? 'Bloquear' : 'Ativar',
+                      style: TextStyle(
+                        color: prof.status == 'ativo' ? AppColors.error : AppColors.success,
+                        fontSize: 12,
+                      ),
                     ),
                     onPressed: () => dir.toggleStatus('profissional', prof.id),
                   )

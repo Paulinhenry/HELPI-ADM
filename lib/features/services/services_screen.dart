@@ -132,7 +132,7 @@ class _ServicesScreenState extends State<ServicesScreen>
                             'WebSocket Ativo',
                             style: TextStyle(
                               color: AppColors.textSecondary,
-                              fontSize: 11,
+                              fontSize: 6,
                               fontWeight: FontWeight.w500,
                             ),
                           ),
@@ -216,15 +216,18 @@ class _ServicesScreenState extends State<ServicesScreen>
                       FaIcon(FontAwesomeIcons.listCheck,
                           size: 18, color: AppColors.primary),
                       const SizedBox(width: 12),
-                      const Text(
-                        'Serviços — Andamento e Histórico',
-                        style: TextStyle(
-                          color: AppColors.textPrimary,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
+                      const Expanded(
+                        child: Text(
+                          'Serviços — Andamento e Histórico',
+                          style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      const Spacer(),
+                      const SizedBox(width: 12),
                       Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 12, vertical: 6),
@@ -349,22 +352,33 @@ class _ServicesScreenState extends State<ServicesScreen>
             children: [
               Row(
                 children: [
-                  Text(
-                    service.id,
-                    style: const TextStyle(
-                      color: AppColors.textMuted,
-                      fontSize: 11,
-                      fontFamily: 'monospace',
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Text(
+                          service.id,
+                          style: const TextStyle(
+                            color: AppColors.textMuted,
+                            fontSize: 11,
+                            fontFamily: 'monospace',
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            service.date,
+                            style: const TextStyle(
+                                color: AppColors.textMuted, fontSize: 11),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Text(
-                    service.date,
-                    style: const TextStyle(
-                        color: AppColors.textMuted, fontSize: 11),
+                  Flexible(
+                    child: StatusBadge.fromStatus(service.status),
                   ),
-                  const Spacer(),
-                  StatusBadge.fromStatus(service.status),
                 ],
               ),
               const SizedBox(height: 10),

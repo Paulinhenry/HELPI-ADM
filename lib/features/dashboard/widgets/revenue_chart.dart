@@ -13,7 +13,8 @@ class RevenueChart extends StatelessWidget {
     final stats = dashboard.stats;
 
     final List<double> revenueData = stats?.faturacao7Dias ?? [0, 0, 0, 0, 0, 0, 0];
-    final maxY = revenueData.isEmpty ? 100.0 : revenueData.reduce((a, b) => a > b ? a : b) * 1.2;
+    final double rawMaxY = revenueData.isEmpty ? 100.0 : revenueData.reduce((a, b) => a > b ? a : b) * 1.2;
+    final double safeMaxY = rawMaxY <= 0 ? 100.0 : rawMaxY;
 
     return Container(
       height: 350,
@@ -43,7 +44,7 @@ class RevenueChart extends StatelessWidget {
                 gridData: FlGridData(
                   show: true,
                   drawVerticalLine: false,
-                  horizontalInterval: maxY == 0 ? 1 : maxY / 4,
+                  horizontalInterval: safeMaxY / 4,
                   getDrawingHorizontalLine: (value) {
                     return FlLine(
                       color: Colors.white.withValues(alpha: 0.05),
@@ -82,7 +83,7 @@ class RevenueChart extends StatelessWidget {
                   leftTitles: AxisTitles(
                     sideTitles: SideTitles(
                       showTitles: true,
-                      interval: maxY == 0 ? 1 : maxY / 4,
+                      interval: safeMaxY / 4,
                       reservedSize: 60,
                       getTitlesWidget: (value, meta) {
                         return SideTitleWidget(
@@ -103,7 +104,7 @@ class RevenueChart extends StatelessWidget {
                 minX: 0,
                 maxX: revenueData.length > 1 ? (revenueData.length - 1).toDouble() : 1,
                 minY: 0,
-                maxY: maxY == 0 ? 100 : maxY,
+                maxY: safeMaxY,
                 lineBarsData: [
                   LineChartBarData(
                     spots: List.generate(
