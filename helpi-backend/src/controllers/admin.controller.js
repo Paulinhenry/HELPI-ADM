@@ -14,7 +14,7 @@ const getDashboardStats = async (req, res, next) => {
         const resFaturacao = await knex('pagamentos')
             .whereRaw('DATE(criado_em) = ?', [todayStr])
             .andWhere('status', 'pago')
-            .sum('preco_final as faturacao_diaria')
+            .sum('valor_total as faturacao_diaria')
             .first();
         
         const faturacaoDiaria = parseFloat(resFaturacao?.faturacao_diaria || 0);
@@ -26,7 +26,7 @@ const getDashboardStats = async (req, res, next) => {
         
         const resGrafico = await knex('pagamentos')
             .select(knex.raw('DATE(criado_em) as data'))
-            .sum('preco_final as total')
+            .sum('valor_total as total')
             .whereRaw('DATE(criado_em) >= ?', [seteDiasStr])
             .andWhere('status', 'pago')
             .groupByRaw('DATE(criado_em)')
