@@ -95,6 +95,9 @@ io.on('connection', (socket) => {
                 await pool.query('UPDATE profissionais SET is_online = true WHERE id = $1', [profissional_id]);
             }
             
+            // Adiciona à sala radar para a contagem do Admin Dashboard
+            socket.join('radar');
+            
             logger.info(`[RADAR] ONLINE: profissional ${profissional_id} ficou online (lat: ${latitude}, lng: ${longitude})`);
 
             // --- NOVO: VERIFICAR CHAMADOS PENDENTES QUE ELE PERDEU ---

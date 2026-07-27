@@ -4,20 +4,45 @@
 // =============================================================
 
 const pool = require('../config/database');
+const knex = require('../config/knex');
 
 // ─── DASHBOARD ───────────────────────────────────────────────
 const getDashboardStats = async (req, res, next) => {
     try {
-        // Faturação do dia
+        // 1. Faturação do Dia (Knex)
         const todayStr = new Date().toISOString().split('T')[0];
-        const resFaturacao = await pool.query(`
-            SELECT COALESCE(SUM(valor_cobrado), 0) as faturacao_diaria 
-            FROM chamados_express 
-            WHERE status IN ('em_andamento', 'concluido', 'pago') 
-            AND criado_em >= $1::date
-        `, [todayStr]);
+        const resFaturacao = await knex('pagamentos')
+            .whereRaw('DATE(criado_em) = ?', [todayStr])
+            .andWhere('status', 'pago')
+            .sum('preco_final as faturacao_diaria')
+            .first();
         
-        const faturacaoDiaria = parseFloat(resFaturacao.rows[0]?.faturacao_diaria || 0);
+        const faturacaoDiaria = parseFloat(resFaturacao?.faturacao_diaria || 0);
+
+        // 2. Gráfico de 7 Dias (Knex)
+        const seteDiasAtras = new Date();
+        seteDiasAtras.setDate(seteDiasAtras.getDate() - 6);
+        const seteDiasStr = seteDiasAtras.toISOString().split('T')[0];
+        
+        const resGrafico = await knex('pagamentos')
+            .select(knex.raw('DATE(criado_em) as data'))
+            .sum('preco_final as total')
+            .whereRaw('DATE(criado_em) >= ?', [seteDiasStr])
+            .andWhere('status', 'pago')
+            .groupByRaw('DATE(criado_em)')
+            .orderBy('data', 'asc');
+            
+        const faturacao_7_dias = [];
+        for (let i = 6; i >= 0; i--) {
+            const d = new Date();
+            d.setDate(d.getDate() - i);
+            const dateStr = d.toISOString().split('T')[0];
+            const found = resGrafico.find(r => {
+                 const rowDate = r.data instanceof Date ? r.data.toISOString().split('T')[0] : r.data;
+                 return rowDate === dateStr || rowDate?.toString().startsWith(dateStr);
+            });
+            faturacao_7_dias.push(parseFloat(found?.total || 0));
+        }
 
         // Chamados Ativos (não concluídos)
         const resChamados = await pool.query(`
@@ -27,20 +52,16 @@ const getDashboardStats = async (req, res, next) => {
         `);
         const ativos = parseInt(resChamados.rows[0]?.count || 0);
 
-        // Profissionais Ativos (Online) - SIMULAÇÃO usando profissionais status = ativo
-        const resOnline = await pool.query(`
-            SELECT COUNT(*) as count 
-            FROM profissionais 
-            WHERE status = 'ativo'
-        `);
-        const onlineCount = parseInt(resOnline.rows[0]?.count || 0);
+        // 3. Profissionais Online (Socket.IO - sala "radar")
+        const io = req.app.get('io');
+        const radarRoom = io ? io.sockets.adapter.rooms.get('radar') : null;
+        const onlineCount = radarRoom ? radarRoom.size : 0;
 
         res.json({
             faturacao_diaria: faturacaoDiaria,
             chamados_ativos: ativos,
             profissionais_online: onlineCount,
-            // mock chart for 7 days
-            faturacao_7_dias: [5000, 7200, 4800, 8900, 6000, 11000, faturacaoDiaria]
+            faturacao_7_dias: faturacao_7_dias
         });
     } catch (erro) {
         next(erro);
@@ -78,10 +99,20 @@ const getPendingProfessionals = async (req, res, next) => {
     }
 };
 
+const fcm = require('../utils/fcm');
+
 const approveProfessional = async (req, res, next) => {
     try {
         const { id } = req.params;
-        await pool.query('UPDATE profissionais SET status = $1 WHERE id = $2', ['ativo', id]);
+        await pool.query('UPDATE profissionais SET status = $1 WHERE id = $2', ['aprovado', id]);
+        
+        // Dispara um Push Notification automático para o profissional
+        await fcm.sendPushNotification(
+            id,
+            'Perfil Aprovado!',
+            'Parabéns! O seu perfil foi aprovado. Ligue o radar para começar a faturar.'
+        );
+        
         res.json({ mensagem: 'Profissional aprovado com sucesso' });
     } catch (erro) {
         next(erro);
@@ -144,6 +175,24 @@ const toggleUserStatus = async (req, res, next) => {
         if(statusRes.rows.length > 0){
             const newStatus = statusRes.rows[0].status === 'ativo' ? 'suspenso' : 'ativo';
             await pool.query(`UPDATE ${tabela} SET status = $1 WHERE id = $2`, [newStatus, id]);
+            
+            if (tabela === 'profissionais' && newStatus === 'suspenso') {
+                const io = req.app.get('io');
+                if (io) {
+                    io.to('profissional_' + id).emit('conta_bloqueada', {
+                        mensagem: 'Conta Suspensa pela Administração'
+                    });
+                    
+                    const profMap = req.app.get('profissionaisConectados');
+                    const profSocketId = profMap ? profMap.get(id) : null;
+                    if (profSocketId) {
+                        io.to(profSocketId).emit('conta_bloqueada', {
+                            mensagem: 'Conta Suspensa pela Administração'
+                        });
+                    }
+                }
+            }
+            
             res.json({ mensagem: `Status atualizado para ${newStatus}` });
         } else {
             res.status(404).json({ erro: 'Usuário não encontrado' });

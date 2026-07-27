@@ -20,9 +20,10 @@ const authAdmin = (req, res, next) => {
 
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-        if (decoded.tipo !== 'admin') {
+        if (decoded.tipo !== 'CEO' && decoded.tipo !== 'SOCIO' && decoded.role !== 'CEO' && decoded.role !== 'SOCIO') {
+            logger.warn(`[SEGURANÇA] Tentativa de invasão detectada Painel Admin! Token ID: ${decoded.id}, Tipo: ${decoded.tipo || decoded.role}`);
             return res.status(403).json({
-                erro: 'Acesso permitido apenas para administradores'
+                erro: 'Acesso negado. Apenas CEO e Sócios têm permissão.'
             });
         }
 
