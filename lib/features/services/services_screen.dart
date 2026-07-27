@@ -105,15 +105,17 @@ class _ServicesScreenState extends State<ServicesScreen>
                       },
                     ),
                     const SizedBox(width: 12),
-                    Text(
-                      '${svc.onlineCount} Profissionais Online',
-                      style: const TextStyle(
-                        color: AppColors.success,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
+                    Expanded(
+                      child: Text(
+                        '${svc.onlineCount} Profissionais Online',
+                        style: const TextStyle(
+                          color: AppColors.success,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    const Spacer(),
                     Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 12, vertical: 6),

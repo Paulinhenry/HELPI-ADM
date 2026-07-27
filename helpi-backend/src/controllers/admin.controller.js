@@ -48,7 +48,7 @@ const getDashboardStats = async (req, res, next) => {
         const resChamados = await pool.query(`
             SELECT COUNT(*) as count 
             FROM chamados_express 
-            WHERE status NOT IN ('concluido', 'pago', 'cancelado')
+            WHERE status IN ('procurando_profissional', 'a_caminho', 'em_servico')
         `);
         const ativos = parseInt(resChamados.rows[0]?.count || 0);
 
