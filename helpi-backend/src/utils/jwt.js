@@ -15,9 +15,11 @@ const REFRESH_TOKEN_EXPIRY = '30d';  // 30 dias
 /**
  * Gera um Access Token (curta duração, usado em todas as requests)
  */
-const gerarAccessToken = (usuarioId, tipo) => {
+const gerarAccessToken = (usuarioId, tipo, role = null) => {
+    const payload = { id: usuarioId, tipo, tokenType: 'access' };
+    if (role) payload.role = role;
     return jwt.sign(
-        { id: usuarioId, tipo, tokenType: 'access' },
+        payload,
         process.env.JWT_SECRET,
         { expiresIn: ACCESS_TOKEN_EXPIRY }
     );
@@ -26,10 +28,12 @@ const gerarAccessToken = (usuarioId, tipo) => {
 /**
  * Gera um Refresh Token (longa duração, usado apenas para renovar o access)
  */
-const gerarRefreshToken = (usuarioId, tipo) => {
+const gerarRefreshToken = (usuarioId, tipo, role = null) => {
     const secret = process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET + '_refresh';
+    const payload = { id: usuarioId, tipo, tokenType: 'refresh' };
+    if (role) payload.role = role;
     return jwt.sign(
-        { id: usuarioId, tipo, tokenType: 'refresh' },
+        payload,
         secret,
         { expiresIn: REFRESH_TOKEN_EXPIRY }
     );
@@ -46,10 +50,10 @@ const verificarRefreshToken = (token) => {
 /**
  * Gera o par completo (access + refresh) — usado no login
  */
-const gerarTokens = (usuarioId, tipo) => {
+const gerarTokens = (usuarioId, tipo, role = null) => {
     return {
-        accessToken: gerarAccessToken(usuarioId, tipo),
-        refreshToken: gerarRefreshToken(usuarioId, tipo),
+        accessToken: gerarAccessToken(usuarioId, tipo, role),
+        refreshToken: gerarRefreshToken(usuarioId, tipo, role),
     };
 };
 

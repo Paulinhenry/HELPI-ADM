@@ -208,9 +208,10 @@ const loginAdmin = async (req, res, next) => {
             });
         }
 
-        const tokens = gerarTokens(admin.id, 'admin');
+        // Passamos o 'role' (ex: CEO, SOCIO) para ficar codificado no JWT
+        const tokens = gerarTokens(admin.id, 'admin', admin.role);
 
-        logger.info(`[AUTH] LOGIN_OK: admin ${admin.id} autenticado com sucesso`);
+        logger.info(`[AUTH] LOGIN_OK: admin ${admin.id} autenticado com sucesso (Role: ${admin.role})`);
 
         res.json({
             mensagem: 'Login realizado com sucesso',
